@@ -3,9 +3,7 @@ title: "final_proj"
 output: html_document
 ---
 
-In terminal, download data via
-> wget https://www.justice.gov/crt/about/vot/notices/vnote022712.xls
-
+# Setup
 ```{r setup}
 library(xlsx)
 library(tidyverse)
@@ -13,10 +11,38 @@ library(stringr)
 STATES <- c("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming")
 ```
 
-## R Markdown
+# Data gathering
+Ex: In terminal, download data via
+> wget https://www.justice.gov/crt/about/vot/notices/vnote022712.xls
 
+Picking data URL
 ```{r}
-#data_messy = read.xlsx("vnote022712.xls", sheetName = "Sheet1")
+dates <- seq(as.Date("2010-09-27"), as.Date("2012-07-30"), by = 1)
+urls <- paste("https://www.justice.gov/crt/about/vot/notices/vnote",
+              str_sub(dates, 6, 7),
+              str_sub(dates, 9, 10),
+              str_sub(dates, 3, 4),
+              ".xls", sep = "")
+```
+
+Downloading the data
+```{r}
+oldw <- getOption("warn")
+options(warn = -1)
+for (url in urls) {
+    tryCatch(download.file(url,
+                           paste("./data/", str_sub(url, 47), sep = ""),
+                           quiet = FALSE),
+             error = function(e) print("")) #consider tracking the successful urls   
+}
+options(warn = oldw)
+```
+
+
+# Data preprocessing
+```{r}
+# iterate through the urls
+#data_messy = read.xlsx("./data/vnote022712.xls", sheetName = "Sheet1")
 data <- data_messy %>%
   select(1, 4, 7, 11, 15, 18, 21, 25) %>%
   unite(NA..23, NA..23, NA..19) %>%
@@ -32,3 +58,5 @@ data <- data_messy %>%
          changes = str_replace(changes, "_NA", ""),
          changes = str_replace(changes, "NA_", ""))
 ```
+
+# Aggregate the data
