@@ -1,0 +1,34 @@
+---
+title: "final_proj"
+output: html_document
+---
+
+In terminal, download data via
+> wget https://www.justice.gov/crt/about/vot/notices/vnote022712.xls
+
+```{r setup}
+library(xlsx)
+library(tidyverse)
+library(stringr)
+STATES <- c("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming")
+```
+
+## R Markdown
+
+```{r}
+#data_messy = read.xlsx("vnote022712.xls", sheetName = "Sheet1")
+data <- data_messy %>%
+  select(1, 4, 7, 11, 15, 18, 21, 25) %>%
+  unite(NA..23, NA..23, NA..19) %>%
+  rename(state = NA.,
+         county = NA..3,
+         subjurisdiction = NA..5,
+         submission = NA..9,
+         action_date = NA..13,
+         action = NA..16,
+         changes = NA..23) %>%
+  filter(state %in% STATES) %>%
+  mutate(action_date = as.Date(action_date, "%m/%d/%Y"),
+         changes = str_replace(changes, "_NA", ""),
+         changes = str_replace(changes, "NA_", ""))
+```
