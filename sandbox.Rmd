@@ -61,6 +61,16 @@ read_and_tidy <- function(fileName) {
     mutate(action_date = as.Date(action_date, "%m/%d/%Y"),
            changes = str_replace(changes, "_NA", ""),
            changes = str_replace(changes, "NA_", ""))
+  
+  # Replace NA values in certain county & subjurisdiction fields, which threw errors when working through Ubuntu
+  levels <- levels(file$county)
+  levels[length(levels) + 1] <- "None"
+  file$county <- factor(file$county, levels = levels)
+  file$county[is.na(file$county)] <- "None"
+  levels <- levels(file$subjurisdiction)
+  levels[length(levels) + 1] <- "None"
+  file$subjurisdiction <- factor(file$subjurisdiction, levels = levels)
+  file$subjurisdiction[is.na(file$subjurisdiction)] <- "None"
   return(file)
 }
 ```

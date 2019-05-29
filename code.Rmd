@@ -1,0 +1,132 @@
+---
+title: "final_proj"
+output: html_document
+---
+
+# Setup
+```{r setup}
+library(xlsx)
+library(tidyverse)
+library(stringr)
+library(plyr)
+library(dplyr)
+library(readr)
+STATES <- c("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming")
+```
+
+# Data gathering
+Ex: In terminal, download data via
+> wget https://www.justice.gov/crt/about/vot/notices/vnote022712.xls
+
+Picking data URL
+```{r}
+dates <- seq(as.Date("2010-09-27"), as.Date("2012-07-30"), by = 1)
+urls <- paste("https://www.justice.gov/crt/about/vot/notices/vnote",
+              str_sub(dates, 6, 7),
+              str_sub(dates, 9, 10),
+              str_sub(dates, 3, 4),
+              ".xls", sep = "")
+```
+
+Downloading the data
+```{r, eval = FALSE}
+oldw <- getOption("warn")
+options(warn = -1)
+for (url in urls) {
+    tryCatch(download.file(url,
+                           paste("./data/", str_sub(url, 47), sep = ""),
+                           quiet = FALSE),
+             error = function(e) print("")) #consider tracking the successful urls   
+}
+options(warn = oldw)
+```
+
+# Data preprocessing
+
+Tidying the data
+```{r}
+read_and_tidy <- function(fileName) {
+  file_messy <- read.xlsx(fileName, sheetName = "Sheet1")
+  file <- file_messy %>%
+    select(1, 4, 7, 11, 15, 18, 21, 25) %>%
+    unite(NA..23, NA..23, NA..19) %>%
+    dplyr::rename(state = NA.,
+                  county = NA..3,
+                  subjurisdiction = NA..5,
+                  submission = NA..9,
+                  action_date = NA..13,
+                  action = NA..16,
+                  changes = NA..23) %>%
+    filter(state %in% STATES) %>%
+    mutate(action_date = as.Date(action_date, "%m/%d/%Y"),
+           changes = str_replace(changes, "_NA", ""),
+           changes = str_replace(changes, "NA_", ""))
+  
+  # Replace NA values in certain county & subjurisdiction fields, which threw errors when working through Ubuntu
+  levels <- levels(file$county)
+  levels[length(levels) + 1] <- "None"
+  file$county <- factor(file$county, levels = levels)
+  file$county[is.na(file$county)] <- "None"
+  levels <- levels(file$subjurisdiction)
+  levels[length(levels) + 1] <- "None"
+  file$subjurisdiction <- factor(file$subjurisdiction, levels = levels)
+  file$subjurisdiction[is.na(file$subjurisdiction)] <- "None"
+  return(file)
+}
+```
+
+Aggregating the data
+```{r}
+myfiles <- list.files(path = "./data", pattern = "*.xls", full.names = TRUE)
+data <- ldply(myfiles, read_and_tidy)
+```
+```{r}
+data %>% 
+ mutate(changes1 = ifelse(str_detect(changes,paste(c("Annexation", "Designation of annexed area to election district"), collapse = '|')) ,1,
+                    ifelse(str_detect(changes,"Polling place"),2, 
+                    ifelse(str_detect(changes,paste(c("General election","Primary elction","Runoff","Referendum","Special Election", "Method of election"), collapse = '|')),3,
+                    ifelse(str_detect(changes,paste(c("Absentee Voting", "Voting method"), collapse = '|')), 4,
+                    ifelse(str_detect(changes, "Election administration"),5,
+                    ifelse(str_detect(changes,"Voter Registration"),6,
+                    ifelse(str_detect(changes, "Abolishment of elected officials"),7,
+                    ifelse(str_detect(changes, "Ballot Format"),8,
+                    ifelse(str_detect(changes, "Bilingual Procedures"),9,
+                    ifelse(str_detect(changes, "Boundary Changes"),10,
+                    ifelse(str_detect(changes, "Campaign fincancing provisions"),11,
+                    ifelse(str_detect(changes, "Candidate qualification"),12,
+                    ifelse(str_detect(changes, "Compensation"),13,
+                    ifelse(str_detect(changes, "Concurrent terms"),14,
+                    ifelse(str_detect(changes,"Creation"),15,
+                    ifelse(str_detect(changes, "Deannexation"),16,
+                    ifelse(str_detect(changes, "Dissolution"), 17,
+                    ifelse(str_detect(changes, "Districting"),18,
+                    ifelse(str_detect(changes, "Establishment"),19,
+                    ifelse(str_detect(changes, "Form"),20,
+                    ifelse(str_detect(changes, "Implementation Schedule"),21,
+                    ifelse(str_detect(changes,"Incorporation"),22,
+                    ifelse(str_detect(changes, "Initiative, Ref"),23,
+                    ifelse(str_detect(changes,"Joint"), 24,
+                    ifelse(str_detect(changes, "Limited"),25,
+                    ifelse(str_detect(changes, "Majority"),26,
+                    ifelse(str_detect(changes, "Method of selection"),27,
+                    ifelse(str_detect(changes, "Method of Staging"),28,
+                    ifelse(str_detect(changes, "Nonpartison"),29,
+                    ifelse(str_detect(changes, "Number of officials"),30,
+                    ifelse(str_detect(changes, "Numbered positions"),31,
+                    ifelse(str_detect(changes, "Plurality"),32,
+                    ifelse(str_detect(changes, "Powers and duties"),33,
+                    ifelse(str_detect(changes, "Precinct"),34,
+                    ifelse(str_detect(changes, paste(c("Redistricting plan","Redistricting Procedures","Consolidation of jurisdiction"),collapse = '|')),35,
+                    ifelse(str_detect(changes, "Redsitricting Procedures"),36,
+                    ifelse(str_detect(changes, "Staggered terms"),37,
+                    ifelse(str_detect(changes, "Term of office"),38,
+                    ifelse(str_detect(changes, "Transfer of powers"),39,
+                    ifelse(str_detect(changes, "Voting qualification"),40,
+                   ifelse(str_detect(changes, "Nominating"),41,  
+                   ifelse(str_detect(changes, "Political activity"),42,
+                   ifelse(str_detect(changes, "Procedures"),43,
+                   ifelse(str_detect(changes, "Purge"),44,45))))))))))))))))))))))))))))))))))))))))))))) %>% 
+view(data)
+```
+#commment for comment sake
+
