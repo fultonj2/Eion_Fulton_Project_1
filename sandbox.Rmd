@@ -11,6 +11,11 @@ library(stringr)
 library(plyr)
 library(dplyr)
 library(readr)
+library(ggplot2)
+# install.packages("devtools")
+# devtools::install_github("haleyjeppson/ggmosaic")
+library(ggmosaic)
+
 STATES <- c("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming")
 ```
 
@@ -79,4 +84,160 @@ Aggregating the data
 ```{r}
 myfiles <- list.files(path = "./data", pattern = "*.xls", full.names = TRUE)
 data <- ldply(myfiles, read_and_tidy)
+```
+
+Plotting the data, using a sample without actual codes
+```{r, eval = FALSE}
+#testing with random sample of full data set
+set.seed(1717)
+samp <- data %>%
+  .[sample(nrow(.), 20000), ] %>%
+  mutate(code = 1 + as.integer(1 * as.integer(changes == "Redistricting plan") +
+                               2 * as.integer(changes == "Annexation"))) %>%
+  mutate(month = format(action_date, "%m"), year = format(action_date, "%Y")) %>%
+  mutate(date = paste(year, month, sep="-")) %>%
+  select('date', 'code')
+
+samp <- samp %>%
+  group_by(date, code) %>%
+  dplyr::summarize(s = sum(code)) %>%
+  mutate(n = s / code) %>% # assume codes are nonzero
+  select(-s)
+temp1 <- samp %>%
+  group_by(date) %>%
+  dplyr::summarize(xwidth = sum(n))
+samp <- samp %>%
+  left_join(temp1, by = "date") %>%
+  print()
+
+samp %>%
+  ggplot(aes(x = factor(date), y = n)) +
+  geom_col(aes(width = xwidth,
+               fill = factor(code)),
+           colour = "white",
+           size = 1,
+           position = position_fill(reverse = TRUE)) +
+  # geom_label(aes(label = n),
+  #            position = position_fill(vjust = 0.5)) +
+  facet_grid(~ date, space = "free", scales = "free", switch = "x") +
+  scale_x_discrete(name = "date") +
+  scale_y_continuous(labels = scales::percent) +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_blank(),
+        strip.background = element_blank(),
+        panel.spacing = unit(0, "pt"))
+```
+
+Encoding the data
+```{r}
+data <- data %>%
+  mutate(code = ifelse(str_detect(changes, paste(c("Redistricting plan",
+                                                   "Consolidation of jurisdiction"),
+                                                 collapse = '|')), 1,
+                ifelse(str_detect(changes, paste(c("Absentee",
+                                                   "Voting method"),
+                                                 collapse = '|')), 2,
+                ifelse(str_detect(changes, "Polling place"), 3,
+                ifelse(str_detect(changes, "Precinct"), 4,
+                ifelse(str_detect(changes, paste(c("Annexation",
+                                                   "Designation of annexed area to election district"),
+                                                 collapse = '|')), 5,
+                ifelse(str_detect(changes, paste(c("General election",
+                                                   "Primary elction",
+                                                   "Runoff",
+                                                   "Referendum",
+                                                   "Special Election",
+                                                   "Method of election"),
+                                                 collapse = '|')), 6,
+                ifelse(str_detect(changes, "Joint"), 7,
+                ifelse(str_detect(changes, "Election administration"), 8,
+                ifelse(str_detect(changes, "Voter Registration"), 9,
+                10 ))))))))))
+                # ifelse(str_detect(changes, "Term of office"), 10,
+                # ifelse(str_detect(changes, "Abolishment"), 11,
+                # ifelse(str_detect(changes, "Ballot format"), 12,
+                # ifelse(str_detect(changes, "Boundary changes"), 13,
+                # ifelse(str_detect(changes, "Campaign financing"), 14,
+                # ifelse(str_detect(changes, "Candidate qualification"), 15,
+                # ifelse(str_detect(changes, "Compensation"), 16,
+                # ifelse(str_detect(changes, "Concurrent terms"), 17,
+                # ifelse(str_detect(changes, "Creation"), 18,
+                # ifelse(str_detect(changes, "Deannexation"), 19,
+                # ifelse(str_detect(changes, "Dissolution"), 20,
+                # ifelse(str_detect(changes, "Districting"), 21,
+                # ifelse(str_detect(changes, "Establishment"), 22,
+                # ifelse(str_detect(changes, "Form"), 23,
+                # ifelse(str_detect(changes, "Implementation Schedule"), 24,
+                # ifelse(str_detect(changes, "Incorporation"), 25,
+                # ifelse(str_detect(changes, "Initiative, Ref"), 26,
+                # ifelse(str_detect(changes, "Limited"), 27,
+                # ifelse(str_detect(changes, "Majority"), 28,
+                # ifelse(str_detect(changes, "Nonpartison"), 29,
+                # ifelse(str_detect(changes, "Number of officials"), 30,
+                # ifelse(str_detect(changes, "Numbered positions"), 31,
+                # ifelse(str_detect(changes, "Powers and duties"), 32,
+                # ifelse(str_detect(changes, "Redistricting procedures"), 33,
+                # ifelse(str_detect(changes, "Staggered terms"), 34,
+                # ifelse(str_detect(changes, "Transfer of powers"), 35,
+                # ifelse(str_detect(changes, "Voting qualification"), 36,
+                # ifelse(str_detect(changes, "Nominating"), 37,
+                # ifelse(str_detect(changes, "Political activity"), 38,
+                # ifelse(str_detect(changes, "Procedures"), 39,
+                # ifelse(str_detect(changes, "Bilingual"), 40,
+                # ifelse(str_detect(changes, "selection"), 41,
+                # ifelse(str_detect(changes, "staging"), 42,
+                # ifelse(str_detect(changes, "Plurality"), 43,
+                # ifelse(str_detect(changes, "Purge"), 44, 45)
+                # ))))))))))))))))))))))))))))))))))))))))))))
+```
+
+Plotting the data
+```{r}
+data_p <- data %>%
+  mutate(month = format(action_date, "%m"),
+         year = format(action_date, "%Y"),
+         date = paste(year, month, sep = "-")) %>%
+  group_by(date, code) %>%
+  dplyr::summarize(s = sum(code)) %>%
+  mutate(n = s / code) %>% # assumes that code values are nonzero
+  select(-s)
+widths <- data_p %>%
+  group_by(date) %>%
+  dplyr::summarize(xwidth = sum(n))
+data_p <- data_p %>%
+  left_join(widths, by = "date")
+
+data_p %>%
+  ggplot(aes(x = factor(date), y = n)) +
+  geom_col(aes(width = xwidth,
+               fill = factor(code)),
+           colour = "white",
+           size = .5,
+           position = position_fill(reverse = TRUE)) +
+  # geom_label(aes(label = n),
+  #           position = position_fill(vjust = 0.5)) +
+  facet_grid(~ date, space = "free", scales = "free", switch = "x") +
+  scale_x_discrete(name = "Month submitted") +
+  scale_y_continuous(labels = scales::percent) +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_blank(),
+        strip.background = element_blank(),
+        panel.spacing = unit(0, "pt")) +
+  scale_fill_discrete(name="",
+                      breaks=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"),
+                      labels=c("redistricting plan",
+                               "voting method",
+                               "polling place",
+                               "precinct",
+                               "annexation",
+                               "general election",
+                               "joint",
+                               "election administration",
+                               "voter registration",
+                               "other"),
+                      guide = guide_legend(reverse=TRUE)) +
+  labs(title = "Preclearance Submissions for the Voting Rights Act of 1965, Section 5")
+  # + facet_wrap(state)
 ```
