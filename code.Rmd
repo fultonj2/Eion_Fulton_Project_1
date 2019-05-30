@@ -8,13 +8,14 @@ output:
     toc_depth: 2
     toc_float: true
     df_print: kable
+    code_folding: hide
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 ```
 
-```{r}
+```{r, echo = TRUE}
 # Step 0: Setup
 # Load relevant libraries
 #data analysis
@@ -64,7 +65,7 @@ for (url in urls) {
 options(warn = oldw)
 ```
 
-```{r}
+```{r, echo = TRUE}
 # Step 2: Import and clean the data
 read_and_tidy <- function(fileName) {
   file_messy <- read.xlsx(fileName, sheetName = "Sheet1")
@@ -95,7 +96,7 @@ read_and_tidy <- function(fileName) {
 }
 ```
 
-```{r}
+```{r, echo = TRUE}
 # Step 3: Join datasets into a single object
 myfiles <- list.files(path = "./data", pattern = "*.xls", full.names = TRUE)
 data <- ldply(myfiles, read_and_tidy)
@@ -156,7 +157,7 @@ data <- data %>%
 ### Graphics
 Below, we plot the preclearance notice changes and their trends in frequency.
 
-```{r}
+```{r, echo = TRUE}
 # Step 5: Plot mosaics of change notices
 #employ only ggplot2, not ggmosaic
 #prepare the data for national plotting
@@ -248,7 +249,7 @@ data_ps %>%
   facet_wrap(~state)
 ```
 
-```{r}
+```{r, echo = TRUE}
 # Step 6: Modelling trends in the preclearance change notices
 #prepare data for regression
 data_t <- data_p %>%
@@ -258,13 +259,13 @@ data_t <- data_p %>%
 data_t[is.na(data_t)] <- 0
 ```
 
-```{r}
+```{r, echo = TRUE}
 #model redistricting notices in terms of precinct notices
 model <- glm(formula = redistricting ~ precinct, data = data_t)
 summary(model)
 
-plot(redistricting ~ precinct, data = data_t)
-abline(model)
+# plot(redistricting ~ precinct, data = data_t)
+# abline(model)
 
 # data_t %>%
 #   ggplot(aes(y = 'redistricting', x = precinct)) +
