@@ -263,14 +263,14 @@ data_t[is.na(data_t)] <- 0
 model <- glm(formula = redistricting ~ precinct, data = data_t)
 summary(model)
 
-# plot(redistricting ~ precinct, data = data_t)
-# abline(model)
+plot(redistricting ~ precinct, data = data_t)
+abline(model)
 
-data_t %>%
-  ggplot(aes(y = 'redistricting', x = precinct)) +
-  geom_point(alpha = 0.3) +
-  labs(y = "Count of redistricting notices", x = "Count of precinct notices") +
-  geom_smooth(method = "lm", se = FALSE)
+# data_t %>%
+#   ggplot(aes(y = 'redistricting', x = precinct)) +
+#   geom_point(alpha = 0.3) +
+#   labs(y = "Count of redistricting notices", x = "Count of precinct notices") +
+#   geom_smooth(method = "lm", se = FALSE)
 ```
 
 A solid relationship exists between the count of redistricting notices and the count of precinct change notices, by month. This makes intuitive sense, since redistricting plans often included modified precincts in order to satisfy the "one person, one vote" population stipulation.
