@@ -1,5 +1,5 @@
 ---
-title: "More Info - Trends in U.S. Preclearance Notices"
+title: "Preclearance Is Not Just For Flights"
 author: "Fulton Jackson, Eion Blanchard"
 date: "Last updated on `r Sys.Date()`"
 output: 
@@ -30,9 +30,13 @@ library(ggplot2)
 # Initialize constants
 STATES <- c("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming")
 ```
+###Background
+The Voting Rights Act of 1965 is a piece of federal legislation that prohibits racial discrimination in regards to voting. Section 5 of the Voting Rights Act prohibits certain jurisdictions from implementing any change affecting voting without receiving preclearance from either the U.S. Attorney General or the U.S. District Court. In this project, we looked at the frequency with which jurisdictions submitted change provisions, their reasons, and which types were most common. We examined weekly data as reported on the Justice Department website from September 2010 to July 2012. We aggregated the posted data sheets into a single set and encoded the change types. When change descriptions overlapped, we applied a common numerical code. 
+
+
 
 ### Question
-insert project statement (question) here
+What types of preclearence requests are states submitting each month? What percentage is the proportion of each request? What sort of factors indicate a request for redistricting?
 
 ### Datasets
 
@@ -152,6 +156,12 @@ data <- data %>%
                 # ifelse(str_detect(changes, "Purge"), 44, 45)
                 # ))))))))))))))))))))))))))))))))))))))))))))
 ```
+#More Info
+As can be seen, not every jurisdiction is subjected to preclearance. The jurisdictions required to submit notices for preclearance were determined according to Section 4(b) of the Voting Rights Act. Within this section, a formula determines which jurisdictions have to submit proposals. The formula stipulates that a jurisdiction must obey preclearance if it satisfies either: 
+	•	As of Nov 1, 1964, 1968, or 1972 the jurisdiction used some sort of metric to restrict the opportunity to register and vote;
+	•	Less than half of the jurisdictions’s eligible citizens were registered on those same dates; or less than half eligible citizens voted for president in those years. 
+Thus, the bulk of the states represented in our data set are part of the Deep South. We note that in the cases of states like California, Florida, New York, North Carolina, South Dakota, Michigan, and New Hampshire, only certain counties or townships satisfied the formula.
+
 
 ### Graphics
 Below, we plot the preclearance notice changes and their trends in frequency.
