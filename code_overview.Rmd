@@ -1,0 +1,244 @@
+---
+title: "Preclearance Is Not Just For Flights"
+author: "Fulton Jackson, Eion Blanchard"
+date: "Last updated on `r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    df_print: kable
+    code_folding: hide
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r, echo = TRUE}
+# Step 0: Setup
+# Load relevant libraries
+#data analysis
+library(xlsx)
+library(tidyverse)
+library(stringr)
+library(plyr)
+library(dplyr)
+library(readr)
+#mapping
+library(ggplot2)
+
+# Initialize constants
+STATES <- c("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming")
+```
+### Background
+The Voting Rights Act of 1965 is a piece of federal legislation that prohibits racial discrimination in regards to voting. Section 5 of the Voting Rights Act prohibits certain jurisdictions from implementing any change affecting voting without receiving preclearance from either the U.S. Attorney General or the U.S. District Court. In this project, we looked at the frequency with which jurisdictions submitted change provisions, their reasons, and which types were most common. We examined weekly data as reported on the Justice Department website from September 2010 to July 2012. We aggregated the posted data sheets into a single set and encoded the change types. When change descriptions overlapped, we applied a common numerical code. 
+
+
+
+### Question
+What types of preclearence requests are states submitting each month? What percentage is the proportion of each request? What sort of factors indicate a request for redistricting?
+
+### Datasets
+
+* Notices of Section 5 activity under the Voting Rights Act of 1965, as amended
+  + Link: https://www.justice.gov/crt/archive-notices-section-5-activity-under-voting-rights-act-1965-amended
+  + Used data for September 27, 2010 to July 30, 2012
+  + Employed .xls version
+  + Noticing state, county, and subjurisdiction logged alongside:
+    - submission ID
+    - action date
+    - changes enacted
+
+```{r, eval = FALSE}
+# Step 1: Download datasets
+dates <- seq(as.Date("2010-09-27"), as.Date("2012-07-30"), by = 1)
+urls <- paste("https://www.justice.gov/crt/about/vot/notices/vnote",
+              str_sub(dates, 6, 7),
+              str_sub(dates, 9, 10),
+              str_sub(dates, 3, 4),
+              ".xls", sep = "")
+oldw <- getOption("warn")
+options(warn = -1)
+for (url in urls) {
+    tryCatch(download.file(url,
+                           paste("./data/", str_sub(url, 47), sep = ""),
+                           quiet = FALSE),
+             error = function(e) print("")) #consider tracking the successful urls   
+}
+options(warn = oldw)
+```
+
+```{r, echo = TRUE}
+# Step 2: Import and clean the data
+read_and_tidy <- function(fileName) {
+  file_messy <- read.xlsx(fileName, sheetName = "Sheet1")
+  file <- file_messy %>%
+    select(1, 4, 7, 11, 15, 18, 21, 25) %>%
+    unite(NA..23, NA..23, NA..19) %>%
+    dplyr::rename(state = NA.,
+                  county = NA..3,
+                  subjurisdiction = NA..5,
+                  submission = NA..9,
+                  action_date = NA..13,
+                  action = NA..16,
+                  changes = NA..23) %>%
+    filter(state %in% STATES) %>%
+    mutate(action_date = as.Date(action_date, "%m/%d/%Y"),
+           changes = str_replace(changes, "_NA", ""),
+           changes = str_replace(changes, "NA_", ""))
+  
+  levels <- levels(file$county)
+  levels[length(levels) + 1] <- "None"
+  file$county <- factor(file$county, levels = levels)
+  file$county[is.na(file$county)] <- "None"
+  levels <- levels(file$subjurisdiction)
+  levels[length(levels) + 1] <- "None"
+  file$subjurisdiction <- factor(file$subjurisdiction, levels = levels)
+  file$subjurisdiction[is.na(file$subjurisdiction)] <- "None"
+  return(file)
+}
+```
+
+```{r, echo = FALSE}
+# Step 3: Join datasets into a single object
+myfiles <- list.files(path = "./data", pattern = "*.xls", full.names = TRUE)
+data <- ldply(myfiles, read_and_tidy)
+```
+
+```{r, echo = FALSE}
+# Step 4: Enrich the data
+#consolidate the described changes and encode the most common
+#account for inconsistencies/generalizations in original dataset
+data <- data %>%
+  mutate(code = ifelse(str_detect(changes, paste(c("edistricting plan", "onsolidation"),collapse = '|')), 1,
+                ifelse(str_detect(changes, paste(c("General election", "Primary election", "Runoff", "Referendum", "Election", "f election", "oint", "election proced"), collapse = '|')), 2,
+                ifelse(str_detect(changes, paste(c("Absentee", "oting method", "oter assist"), collapse = '|')), 3,
+                ifelse(str_detect(changes, "olling place"), 4,
+                ifelse(str_detect(changes, "recinct"), 5,
+                ifelse(str_detect(changes, paste(c("Annexation", "annexed area"), collapse = '|')), 6,
+                ifelse(str_detect(changes, "egistration"), 7,
+                8 ))))))))
+                # ifelse(str_detect(changes, "dministration"), 9,
+                # ifelse(str_detect(changes, "Term of office"), 10,
+                # ifelse(str_detect(changes, "Abolishment"), 11,
+                # ifelse(str_detect(changes, "Ballot format"), 12,
+                # ifelse(str_detect(changes, "Boundary changes"), 13,
+                # ifelse(str_detect(changes, "Campaign financing"), 14,
+                # ifelse(str_detect(changes, "Candidate qualification"), 15,
+                # ifelse(str_detect(changes, "Compensation"), 16,
+                # ifelse(str_detect(changes, "Concurrent terms"), 17,
+                # ifelse(str_detect(changes, "Creation"), 18,
+                # ifelse(str_detect(changes, "Deannexation"), 19,
+                # ifelse(str_detect(changes, "Dissolution"), 20,
+                # ifelse(str_detect(changes, "Districting"), 21,
+                # ifelse(str_detect(changes, "Establishment"), 22,
+                # ifelse(str_detect(changes, "Form"), 23,
+                # ifelse(str_detect(changes, "Implementation Schedule"), 24,
+                # ifelse(str_detect(changes, "Incorporation"), 25,
+                # ifelse(str_detect(changes, "Initiative, Ref"), 26,
+                # ifelse(str_detect(changes, "Limited"), 27,
+                # ifelse(str_detect(changes, "Majority"), 28,
+                # ifelse(str_detect(changes, "Nonpartison"), 29,
+                # ifelse(str_detect(changes, "Number of officials"), 30,
+                # ifelse(str_detect(changes, "Numbered positions"), 31,
+                # ifelse(str_detect(changes, "Powers and duties"), 32,
+                # ifelse(str_detect(changes, "Redistricting procedures"), 33,
+                # ifelse(str_detect(changes, "Staggered terms"), 34,
+                # ifelse(str_detect(changes, "Transfer of powers"), 35,
+                # ifelse(str_detect(changes, "Voting qualification"), 36,
+                # ifelse(str_detect(changes, "Nominating"), 37,
+                # ifelse(str_detect(changes, "Political activity"), 38,
+                # ifelse(str_detect(changes, "Procedures"), 39,
+                # ifelse(str_detect(changes, "Bilingual"), 40,
+                # ifelse(str_detect(changes, "selection"), 41,
+                # ifelse(str_detect(changes, "staging"), 42,
+                # ifelse(str_detect(changes, "Plurality"), 43,
+                # ifelse(str_detect(changes, "Purge"), 44, 45)
+                # ))))))))))))))))))))))))))))))))))))))))))))
+```
+
+```{r}
+### More Info
+# As can be seen, not every jurisdiction is subjected to preclearance. The jurisdictions required to submit notices for preclearance were determined according to Section 4(b) of the Voting Rights Act. Within this section, a formula determines which jurisdictions have to submit proposals. The formula stipulates that a jurisdiction must obey preclearance if it satisfies either: 
+# 	•	As of Nov 1, 1964, 1968, or 1972 the jurisdiction used some sort of metric to restrict the opportunity to register and vote;
+# 	•	Less than half of the jurisdictions’s eligible citizens were registered on those same dates; or less than half eligible citizens voted for president in those years. 
+# Thus, the bulk of the states represented in our data set are part of the Deep South. We note that in the cases of states like California, Florida, New York, North Carolina, South Dakota, Michigan, and New Hampshire, only certain counties or townships satisfied the formula.
+```
+
+
+### Graphic
+Below, we plot the preclearance notice changes and their trends in frequency.
+
+```{r, echo = TRUE}
+# Step 5: Plot mosaics of change notices
+#employ only ggplot2, not ggmosaic
+#prepare the data for national plotting
+data_p <- data %>%
+  mutate(date = format(action_date, "%y %m")) %>%
+  group_by(date, code) %>%
+  dplyr::summarize(s = sum(code)) %>%
+  mutate(n = s / code) %>% # assumes that code values are nonzero
+  select(-s)
+widths <- data_p %>%
+  group_by(date) %>%
+  dplyr::summarize(xwidth = sum(n))
+data_p <- data_p %>%
+  left_join(widths, by = "date") %>%
+  mutate(month = format(as.Date(paste(date, "01", sep = " "), "%Y %m %d"), "%b '%y"))
+data_p$month = factor(data_p$month,
+                      levels=c("Sep '10", "Oct '10", "Nov '10", "Dec '10",
+                               "Jan '11", "Feb '11", "Mar '11", "Apr '11", "May '11", "Jun '11",
+                               "Jul '11", "Aug '11", "Sep '11", "Oct '11", "Nov '11", "Dec '11",
+                               "Jan '12", "Feb '12", "Mar '12", "Apr '12", "May '12", "Jun '12", "Jul '12"))
+#plot the mosaic for combined national counts
+data_p %>%
+  print()%>%
+  ggplot(aes(x = factor(month), y = n)) +
+  geom_col(aes(width = xwidth,
+               fill = factor(code)),
+           colour = "white",
+           size = .5,
+           position = position_fill(reverse = TRUE)) +
+  facet_grid(~ month, space = "free", scales = "free", switch = "x") +
+  scale_x_discrete(name = "Month submitted") +
+  scale_y_continuous(labels = scales::percent) +
+  theme(strip.text.x = element_text(size = 6.5, angle = 0),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_blank(),
+        strip.background = element_blank(),
+        panel.spacing = unit(0, "pt")) +
+  scale_fill_discrete(name = "",
+                      breaks = c("1", "2", "3", "4", "5", "6", "7", "8"),
+                      labels = c("redistricting plan", "election procedures", "voting method", "polling place", "precinct", "annexation", "voter registration", "other"),
+                      guide = guide_legend(reverse=TRUE)) +
+  labs(title = "Preclearance Submissions for the Voting Rights Act of 1965, Section 5")
+```
+
+```{r, echo = TRUE}
+# Step 6: Modelling trends in the preclearance change notices
+#prepare data for regression
+data_t <- data_p %>%
+  select(-xwidth) %>%
+  spread(key = code, value = n) %>%
+  dplyr::rename(redistricting = 3, election = 4, method = 5, polling = 6, precinct = 7, annex = 8, registration = 9, other = 10)
+data_t[is.na(data_t)] <- 0
+```
+
+```{r, echo = TRUE}
+#model redistricting notices in terms of precinct notices
+model <- glm(formula = redistricting ~ precinct, data = data_t)
+summary(model)
+
+# plot(redistricting ~ precinct, data = data_t)
+# abline(model)
+
+# data_t %>%
+#   ggplot(aes(y = 'redistricting', x = precinct)) +
+#   geom_point(alpha = 0.3) +
+#   labs(y = "Count of redistricting notices", x = "Count of precinct notices") +
+#   geom_smooth(method = "lm", se = FALSE)
+```
+
+A solid relationship exists between the count of redistricting notices and the count of precinct change notices, by month. This makes intuitive sense, since redistricting plans often included modified precincts in order to satisfy the "one person, one vote" population stipulation.
