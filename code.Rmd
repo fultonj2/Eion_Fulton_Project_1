@@ -1,37 +1,58 @@
 ---
-title: "final_proj"
-output: html_document
+title: "More Info - Trends in U.S. Preclearance Notices"
+author: "Fulton Jackson, Eion Blanchard"
+date: "Last updated on `r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    df_print: kable
 ---
 
-# Setup
-```{r setup}
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+# Step 0: Setup
+# Load relevant libraries
+#data analysis
 library(xlsx)
 library(tidyverse)
 library(stringr)
 library(plyr)
 library(dplyr)
 library(readr)
+#mapping
 library(ggplot2)
-# install.packages("devtools")
-# devtools::install_github("haleyjeppson/ggmosaic")
-# library(ggmosaic)
 
+# Initialize constants
 STATES <- c("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming")
 ```
 
-# Data gathering
-Ex: In terminal, download data via
-> wget https://www.justice.gov/crt/about/vot/notices/vnote022712.xls
+### Question
+insert project statement (question) here
 
-Picking data URLs and downloading the data
+### Datasets
+
+* Notices of Section 5 activity under the Voting Rights Act of 1965, as amended
+  + Link: https://www.justice.gov/crt/archive-notices-section-5-activity-under-voting-rights-act-1965-amended
+  + Used data for September 27, 2010 to July 30, 2012
+  + Employed .xls version
+  + Noticing state, county, and subjurisdiction logged alongside:
+    - submission ID
+    - action date
+    - changes enacted
+
 ```{r, eval = FALSE}
+# Step 1: Download datasets
 dates <- seq(as.Date("2010-09-27"), as.Date("2012-07-30"), by = 1)
 urls <- paste("https://www.justice.gov/crt/about/vot/notices/vnote",
               str_sub(dates, 6, 7),
               str_sub(dates, 9, 10),
               str_sub(dates, 3, 4),
               ".xls", sep = "")
-
 oldw <- getOption("warn")
 options(warn = -1)
 for (url in urls) {
@@ -43,10 +64,8 @@ for (url in urls) {
 options(warn = oldw)
 ```
 
-# Data preprocessing
-
-Tidying the data
 ```{r}
+# Step 2: Import and clean the data
 read_and_tidy <- function(fileName) {
   file_messy <- read.xlsx(fileName, sheetName = "Sheet1")
   file <- file_messy %>%
@@ -64,7 +83,6 @@ read_and_tidy <- function(fileName) {
            changes = str_replace(changes, "_NA", ""),
            changes = str_replace(changes, "NA_", ""))
   
-  # Replace NA values in certain county & subjurisdiction fields, which threw errors when working through Ubuntu
   levels <- levels(file$county)
   levels[length(levels) + 1] <- "None"
   file$county <- factor(file$county, levels = levels)
@@ -77,79 +95,23 @@ read_and_tidy <- function(fileName) {
 }
 ```
 
-Aggregating the data
 ```{r}
+# Step 3: Join datasets into a single object
 myfiles <- list.files(path = "./data", pattern = "*.xls", full.names = TRUE)
 data <- ldply(myfiles, read_and_tidy)
 ```
 
-Plotting the data, using a sample without actual codes
-```{r, eval = FALSE}
-#testing with random sample of full data set
-set.seed(1717)
-samp <- data %>%
-  .[sample(nrow(.), 20000), ] %>%
-  mutate(code = 1 + as.integer(1 * as.integer(changes == "Redistricting plan") +
-                               2 * as.integer(changes == "Annexation"))) %>%
-  mutate(month = format(action_date, "%m"), year = format(action_date, "%Y")) %>%
-  mutate(date = paste(year, month, sep="-")) %>%
-  select('date', 'code')
-
-samp <- samp %>%
-  group_by(date, code) %>%
-  dplyr::summarize(s = sum(code)) %>%
-  mutate(n = s / code) %>% # assume codes are nonzero
-  select(-s)
-temp1 <- samp %>%
-  group_by(date) %>%
-  dplyr::summarize(xwidth = sum(n))
-samp <- samp %>%
-  left_join(temp1, by = "date") %>%
-  print()
-
-samp %>%
-  ggplot(aes(x = factor(date), y = n)) +
-  geom_col(aes(width = xwidth,
-               fill = factor(code)),
-           colour = "white",
-           size = 1,
-           position = position_fill(reverse = TRUE)) +
-  # geom_label(aes(label = n),
-  #            position = position_fill(vjust = 0.5)) +
-  facet_grid(~ date, space = "free", scales = "free", switch = "x") +
-  scale_x_discrete(name = "date") +
-  scale_y_continuous(labels = scales::percent) +
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        axis.title.y = element_blank(),
-        strip.background = element_blank(),
-        panel.spacing = unit(0, "pt"))
-```
-
-Encoding the data
 ```{r}
+# Step 4: Enrich the data
+#consolidate the described changes and encode the most common
+#account for inconsistencies/generalizations in original dataset
 data <- data %>%
-  mutate(code = ifelse(str_detect(changes, paste(c("edistricting plan",
-                                                   "onsolidation"),
-                                                 collapse = '|')), 1,
-                ifelse(str_detect(changes, paste(c("General election",
-                                                   "Primary election",
-                                                   "Runoff",
-                                                   "Referendum",
-                                                   "Election",
-                                                   "f election",
-                                                   "oint",
-                                                   "election proced"),
-                                                 collapse = '|')), 2,
-                ifelse(str_detect(changes, paste(c("Absentee",
-                                                   "oting method",
-                                                   "oter assist"),
-                                                 collapse = '|')), 3,
+  mutate(code = ifelse(str_detect(changes, paste(c("edistricting plan", "onsolidation"),collapse = '|')), 1,
+                ifelse(str_detect(changes, paste(c("General election", "Primary election", "Runoff", "Referendum", "Election", "f election", "oint", "election proced"), collapse = '|')), 2,
+                ifelse(str_detect(changes, paste(c("Absentee", "oting method", "oter assist"), collapse = '|')), 3,
                 ifelse(str_detect(changes, "olling place"), 4,
                 ifelse(str_detect(changes, "recinct"), 5,
-                ifelse(str_detect(changes, paste(c("Annexation",
-                                                   "annexed area"),
-                                                 collapse = '|')), 6,
+                ifelse(str_detect(changes, paste(c("Annexation", "annexed area"), collapse = '|')), 6,
                 ifelse(str_detect(changes, "egistration"), 7,
                 8 ))))))))
                 # ifelse(str_detect(changes, "dministration"), 9,
@@ -191,8 +153,13 @@ data <- data %>%
                 # ))))))))))))))))))))))))))))))))))))))))))))
 ```
 
-Plotting the data (overall)
+### Graphics
+Below, we plot the preclearance notice changes and their trends in frequency.
+
 ```{r}
+# Step 5: Plot mosaics of change notices
+#employ only ggplot2, not ggmosaic
+#prepare the data for national plotting
 data_p <- data %>%
   mutate(date = format(action_date, "%y %m")) %>%
   group_by(date, code) %>%
@@ -209,9 +176,8 @@ data_p$month = factor(data_p$month,
                       levels=c("Sep '10", "Oct '10", "Nov '10", "Dec '10",
                                "Jan '11", "Feb '11", "Mar '11", "Apr '11", "May '11", "Jun '11",
                                "Jul '11", "Aug '11", "Sep '11", "Oct '11", "Nov '11", "Dec '11",
-                               "Jan '12", "Feb '12", "Mar '12", "Apr '12", "May '12", "Jun '12",
-                               "Jul '12"))
-
+                               "Jan '12", "Feb '12", "Mar '12", "Apr '12", "May '12", "Jun '12", "Jul '12"))
+#plot the mosaic for combined national counts
 data_p %>%
   print()%>%
   ggplot(aes(x = factor(month), y = n)) +
@@ -220,8 +186,6 @@ data_p %>%
            colour = "white",
            size = .5,
            position = position_fill(reverse = TRUE)) +
-  # geom_label(aes(label = n),
-  #           position = position_fill(vjust = 0.5)) +
   facet_grid(~ month, space = "free", scales = "free", switch = "x") +
   scale_x_discrete(name = "Month submitted") +
   scale_y_continuous(labels = scales::percent) +
@@ -233,20 +197,13 @@ data_p %>%
         panel.spacing = unit(0, "pt")) +
   scale_fill_discrete(name = "",
                       breaks = c("1", "2", "3", "4", "5", "6", "7", "8"),
-                      labels = c("redistricting plan",
-                                 "election procedures",
-                                 "voting method",
-                                 "polling place",
-                                 "precinct",
-                                 "annexation",
-                                 "voter registration",
-                                 "other"),
+                      labels = c("redistricting plan", "election procedures", "voting method", "polling place", "precinct", "annexation", "voter registration", "other"),
                       guide = guide_legend(reverse=TRUE)) +
   labs(title = "Preclearance Submissions for the Voting Rights Act of 1965, Section 5")
 ```
 
-Plotting the data (by state)
 ```{r}
+#prepare the data for statewide plotting
 data_ps <- data %>%
   mutate(date = format(action_date, "%y %m")) %>%
   group_by(date, code, state) %>%
@@ -265,7 +222,7 @@ data_ps$month = factor(data_ps$month,
                                "Jul '11", "Aug '11", "Sep '11", "Oct '11", "Nov '11", "Dec '11",
                                "Jan '12", "Feb '12", "Mar '12", "Apr '12", "May '12", "Jun '12",
                                "Jul '12"))
-
+#plot the mosaic for combined state counts
 data_ps %>%
   print()%>%
   ggplot(aes(x = factor(month), y = n)) +
@@ -274,8 +231,6 @@ data_ps %>%
            colour = "white",
            size = .5,
            position = position_fill(reverse = TRUE)) +
-  # geom_label(aes(label = n),
-  #           position = position_fill(vjust = 0.5)) +
   facet_grid(~ month, space = "free", scales = "free", switch = "x") +
   scale_x_discrete(name = "Month submitted") +
   scale_y_continuous(labels = scales::percent) +
@@ -287,49 +242,53 @@ data_ps %>%
         panel.spacing = unit(0, "pt")) +
   scale_fill_discrete(name = "",
                       breaks = c("1", "2", "3", "4", "5", "6", "7", "8"),
-                      labels = c("redistricting plan",
-                                 "election procedures",
-                                 "voting method",
-                                 "polling place",
-                                 "precinct",
-                                 "annexation",
-                                 "voter registration",
-                                 "other"),
+                      labels = c("redistricting plan", "election procedures", "voting method", "polling place", "precinct", "annexation", "voter registration", "other"),
                       guide = guide_legend(reverse=TRUE)) +
-  labs(title = "Preclearance Submissions for the Voting Rights Act of 1965, Section 5") +
+  labs(title = "Preclearance Submissions for the Voting Rights Act of 1965, Section 5 (by state)") +
   facet_wrap(~state)
 ```
 
-# Postprocessing the data (modeling)
 ```{r}
+# Step 6: Modelling trends in the preclearance change notices
+#prepare data for regression
 data_t <- data_p %>%
   select(-xwidth) %>%
   spread(key = code, value = n) %>%
-  dplyr::rename(c1 = 3, c2 = 4, c3 = 5, c4 = 6, c5 = 7, c6 = 8, c7 = 9, c8 = 10)
+  dplyr::rename(redistricting = 3, election = 4, method = 5, polling = 6, precinct = 7, annex = 8, registration = 9, other = 10)
 data_t[is.na(data_t)] <- 0
-
-prec_glm <- glm(formula = c1 ~ c2 + c3 + c4 + c5 + c6 + c7,
-                      data = data_t)
-summary(prec_glm)
-
-prec_5lm <- glm(formula = c1 ~ c5,
-                      data = data_t)
-summary(prec_5lm)
-plot(c1 ~ c5, data = data_t)
-abline(prec_5lm)
-
-prec_mlm <- glm(formula = c1 ~ c2 + c3 + c4 + c6 + c7,
-                      data = data_t)
-summary(prec_mlm)
-
-prec_43lm <- glm(formula = c1 ~ c4 + c3,
-                      data = data_t)
-summary(prec_43lm)
-
-prec_2lm <- glm(formula = c1 ~ c2,
-                      data = data_t)
-summary(prec_2lm)
-
-# results indicate that the count of redistricting notices is best predicted by that of precinct change notices, which is unsurprising. Without this predictor, however, an accurate estimate for the redistricting count can be made from changes of polling place then of voting method.
-# lastly, we note the weak correlation between counts of redistricting and of election procedure notices. This seems relieving.
 ```
+
+```{r}
+#model redistricting notices in terms of precinct notices
+model <- glm(formula = redistricting ~ precinct, data = data_t)
+summary(model)
+
+# plot(redistricting ~ precinct, data = data_t)
+# abline(model)
+
+data_t %>%
+  ggplot(aes(y = 'redistricting', x = precinct)) +
+  geom_point(alpha = 0.3) +
+  labs(y = "Count of redistricting notices", x = "Count of precinct notices") +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+A solid relationship exists between the count of redistricting notices and the count of precinct change notices, by month. This makes intuitive sense, since redistricting plans often included modified precincts in order to satisfy the "one person, one vote" population stipulation.
+
+```{r}
+#model and plot redistricting notices in terms of other relevant counts
+model <- glm(formula = redistricting ~ polling + method, data = data_t)
+summary(model)
+plot(model)
+```
+
+Without the predictor of precinct change notices, we may gain an accurate estimate for the count of redistricting notices from the polling place and the voting method notices.
+
+```{r}
+#model and plot redistricting notices in terms of election procedure notcies
+model <- glm(formula = redistricting ~ election, data = data_t)
+summary(model)
+plot(model)
+```
+
+A weak correlation exists between the counts of redistricting and election procedure change notices.
